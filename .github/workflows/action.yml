@@ -1,4 +1,5 @@
-# Demo: GitHub attestations (provenance + SBOM) only. No Cosign signing — CI stays green.
+# GitHub attestations (provenance + SBOM) aligned with customer flow: actions/attest-build-provenance@v2
+# wraps actions/attest (same pattern as RevUp composite → attest-build-provenance). No Cosign signing.
 name: CI
 
 on:
@@ -94,7 +95,7 @@ jobs:
             IMAGE_TYPE=github-attestation
 
       - name: Generate build provenance attestation
-        uses: actions/attest-build-provenance@v3
+        uses: actions/attest-build-provenance@v2
         with:
           subject-name: ${{ matrix.registry }}
           subject-digest: ${{ steps.build.outputs.digest }}
@@ -144,7 +145,7 @@ jobs:
           output-file: sbom.spdx.json
 
       - name: Create SBOM attestation
-        uses: actions/attest-sbom@v3
+        uses: actions/attest-sbom@v2
         with:
           subject-name: ${{ matrix.registry }}
           subject-digest: ${{ steps.build.outputs.digest }}
