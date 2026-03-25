@@ -1,13 +1,27 @@
-# ImageValidatingPolicy: verify GitHub Artifact Attestation (SLSA provenance).
+# ImageValidatingPolicy: GitHub Artifact Attestations (SLSA build provenance).
+# Trusts provenance produced by: nirmata/pov-attestation-test → .github/workflows/action.yml (CI workflow).
+#
+# Test (after: kubectl apply -f sample-policies/verify-github-provenance.yaml):
+#   Trusted CI (expect ALLOW):
+#     kubectl apply -f sample-resources/pod-attested-github.yaml
+#   Different repo’s attestation / wrong workflow (expect DENY):
+#     kubectl apply -f sample-resources/pod-unattested-github.yaml
+#     (ghcr.io/nirmata/kubectl is signed by nirmata/kubectl’s workflow, not pov-attestation-test — denied by identity.)
+#   Cleanup: kubectl delete -f sample-resources/pod-attested-github.yaml sample-resources/pod-unattested-github.yaml --ignore-not-found
+#
+# Kyverno: use a single keyless identity (subjectRegExp); multiple identity entries are not supported yet.
+#
+# If verification fails on Rekor, set spec.attestors[0].cosign.ctlog.insecureIgnoreTlog: true (testing only).
 apiVersion: policies.kyverno.io/v1
 kind: ImageValidatingPolicy
 metadata:
   name: verify-github-provenance
   annotations:
-    policies.kyverno.io/title: Verify GitHub SLSA provenance attestation
+    policies.kyverno.io/title: Verify GitHub SLSA provenance (pov-attestation-test CI)
     policies.kyverno.io/category: Software Supply Chain Security
     policies.kyverno.io/description: >-
-      Enforces SLSA provenance from GitHub Artifact Attestations (build-and-attest workflow).
+      Requires SLSA provenance (in-toto) from GitHub Actions for ghcr.io/nirmata/* images,
+      signed by the pov-attestation-test CI workflow (actions/attest-build-provenance).
 spec:
   validationActions: [Deny]
   failurePolicy: Fail
@@ -30,13 +44,12 @@ spec:
       cosign:
         keyless:
           identities:
-            - subject: "https://github.com/nirmata/demo-supply-chain/.github/workflows/build-and-attest.yml@refs/heads/main"
-              issuer: "https://token.actions.githubusercontent.com"
+            # One entry only: main branch or v* tags on this workflow (Kyverno does not support multiple identities here yet).
             - issuer: "https://token.actions.githubusercontent.com"
-              subjectRegExp: "https://github\\.com/nirmata/demo-supply-chain/\\.github/workflows/build-and-attest\\.yml@refs/tags/v.*"
+              subjectRegExp: "^https://github\\.com/nirmata/pov-attestation-test/\\.github/workflows/action\\.yml@(refs/heads/main|refs/tags/v[0-9].*)$"
         ctlog:
           url: "https://rekor.sigstore.dev"
   validations:
     - expression: >-
         images.containers.map(image, verifyAttestationSignatures(image, attestations.slsa, [attestors.cosign])).all(e, e > 0)
-      message: "Failed to verify SLSA provenance attestation"
+      message: "Failed to verify SLSA provenance attestation for this image (expected GitHub Actions attestation from pov-attestation-test CI)."

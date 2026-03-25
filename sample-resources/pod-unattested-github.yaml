@@ -1,0 +1,13 @@
+# Expect: rejected (DENY) — provenance is from nirmata/kubectl’s workflow, not pov-attestation-test/.github/workflows/action.yml.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-unattested-github
+  namespace: default
+  labels:
+    app: attestation-test
+spec:
+  containers:
+    - name: app
+      image: ghcr.io/nirmata/kubectl:1.35.0
+      command: ["sleep", "3600"]

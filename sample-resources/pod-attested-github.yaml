@@ -1,0 +1,14 @@
+# Expect: admitted when ImageValidatingPolicy verify-github-provenance is active
+# (image was built and attested by pov-attestation-test CI).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-attested-github
+  namespace: default
+  labels:
+    app: attestation-test
+spec:
+  containers:
+    - name: app
+      image: ghcr.io/nirmata/pov-github-attestations-sbom:github-attestation
+      command: ["/bin/sh", "-c", "sleep 3600"]
