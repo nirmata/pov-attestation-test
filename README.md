@@ -6,11 +6,8 @@ Workflow: `.github/workflows/action.yml` (job **CI**). Image: `ghcr.io/<org>/pov
 
 ## Trigger CI
 
-| Action | Effect |
-|--------|--------|
-| **Push** to any branch | Runs **CI** on that push. |
-| **Open or update a PR** | Runs **CI** for the PR (same workflow; `pull_request`). |
-| **Merge to default branch** | Runs **CI** on the merge commit. |
+
+**Open  a PR**  and it Runs **CI** for the PR 
 
 Check **Actions** → **CI** for status. When it’s green, the attested image tag above should exist on GHCR.
 
