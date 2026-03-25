@@ -1,16 +1,3 @@
-# ImageValidatingPolicy: GitHub Artifact Attestations (SLSA build provenance).
-# Trusts provenance produced by: nirmata/pov-attestation-test → .github/workflows/action.yml (CI workflow).
-#
-# Test (after: kubectl apply -f sample-policies/verify-github-provenance.yaml):
-#   Trusted CI (expect ALLOW):
-#     kubectl apply -f sample-resources/pod-attested-github.yaml
-#   Different repo’s attestation / wrong workflow (expect DENY):
-#     kubectl apply -f sample-resources/pod-unattested-github.yaml
-#     (ghcr.io/nirmata/kubectl is signed by nirmata/kubectl’s workflow, not pov-attestation-test — denied by identity.)
-#   Cleanup: kubectl delete -f sample-resources/pod-attested-github.yaml sample-resources/pod-unattested-github.yaml --ignore-not-found
-#
-# Kyverno: use a single keyless identity (subjectRegExp); multiple identity entries are not supported yet.
-#
 # If verification fails on Rekor, set spec.attestors[0].cosign.ctlog.insecureIgnoreTlog: true (testing only).
 apiVersion: policies.kyverno.io/v1
 kind: ImageValidatingPolicy
