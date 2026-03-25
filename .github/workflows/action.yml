@@ -13,7 +13,8 @@ permissions:
   attestations: write
 
 env:
-  IMAGE_NAME: "demo-github-attestations-sbom"
+  # Unique package name so GHCR links the image to this repo (avoids write_package denied vs demo-attestations-kyverno).
+  IMAGE_NAME: "pov-github-attestations-sbom"
 
 jobs:
   setup-registries:
