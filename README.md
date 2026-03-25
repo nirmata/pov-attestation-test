@@ -1,90 +1,61 @@
-# Demo: GitHub attestations + SBOM with Kyverno
+# GitHub build provenance + Kyverno
 
+GitHub Actions builds a container image, attaches **SLSA build provenance** ([artifact attestations](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations#generating-build-provenance-for-container-images)), and pushes to GHCR. **Kyverno** can enforce that only images with provenance from this repo’s workflow are admitted.
 
-This repo demonstrates **supply-chain controls** using GitHub Artifact Attestations (provenance + SBOM) and **Kyverno ImageValidatingPolicy** for cluster enforcement.
+Workflow: `.github/workflows/action.yml` (job **CI**). Image: `ghcr.io/<org>/pov-github-attestations-sbom:github-attestation`.
 
-- **Pipeline:** GitHub Actions builds images and attaches SLSA provenance and SPDX SBOM attestations  (Uses the [GitHub artifact attestations](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations#generating-build-provenance-for-container-images) flow)
-- **Cluster:** Kyverno verifies those attestations at admission time.
+## Trigger CI
 
+| Action | Effect |
+|--------|--------|
+| **Push** to any branch | Runs **CI** on that push. |
+| **Open or update a PR** | Runs **CI** for the PR (same workflow; `pull_request`). |
+| **Merge to default branch** | Runs **CI** on the merge commit. |
 
+Check **Actions** → **CI** for status. When it’s green, the attested image tag above should exist on GHCR.
 
-## Pipeline
-
-A single **CI** workflow (`.github/workflows/ci.yml`) runs on push and pull requests:
-
-- Builds and pushes images with fixed tags:
-  - **`:github-attestation`** — image with SLSA build provenance attestation
-  - **`:github-sbom`** — image with SPDX SBOM attestation
-- Uses `actions/attest-build-provenance@v3` and `actions/attest-sbom@v3` with `push-to-registry: true`.
-
-## How to run
-
-Push to `main` or open a PR to trigger CI. Or run the workflow manually from **Actions** → **CI** → **Run workflow**.
-
-Images are published to:
-
-- `ghcr.io/YOUR_ORG/demo-github-attestations-sbom:github-attestation`
-- `ghcr.io/YOUR_ORG/demo-github-attestations-sbom:github-sbom`
-
-Replace `YOUR_ORG` with your GitHub org or username.
-
-## Verify attestations
-
-**In GitHub:** Open a workflow run → **Attestations**.
-
-**With GitHub CLI:**
+**Verify locally (optional):**
 
 ```bash
 docker login ghcr.io
-gh attestation verify oci://ghcr.io/YOUR_ORG/demo-github-attestations-sbom:github-attestation -R YOUR_ORG/demo-github-attestations-sbom
+gh attestation verify oci://ghcr.io/<org>/pov-github-attestations-sbom:github-attestation \
+  -R <org>/pov-attestation-test \
+  --predicate-type https://slsa.dev/provenance/v1
 ```
 
-Provenance (SLSA):
+Replace `<org>` with your GitHub org or user (e.g. `nirmata`).
 
-```bash
-gh attestation verify oci://ghcr.io/YOUR_ORG/demo-github-attestations-sbom:github-attestation \
-  -R YOUR_ORG/demo-github-attestations-sbom \
-  --predicate-type https://slsa.dev/provenance/v1 \
-  --format json
-```
-
-SBOM (SPDX):
-
-```bash
-gh attestation verify oci://ghcr.io/YOUR_ORG/demo-github-attestations-sbom:github-sbom \
-  -R YOUR_ORG/demo-github-attestations-sbom \
-  --predicate-type https://spdx.dev/Document/v2.3 \
-  --format json
-```
-
-## Cluster enforcement with Kyverno
-
-Requires **Kyverno v1.17+** and ImageValidatingPolicy support.
-
-Policies (provenance + SBOM) are in **`sample-policies/`**:
-
-- `verify-github-provenance.yaml` — verify SLSA provenance attestation
-- `verify-github-sbom.yaml` — verify SPDX SBOM attestation
-
-**Deploy:**
+## Deploy the policy (Kyverno 1.17+)
 
 ```bash
 kubectl apply -f sample-policies/verify-github-provenance.yaml
-kubectl apply -f sample-policies/verify-github-sbom.yaml
 ```
 
+The policy matches `ghcr.io/<org>/*` and expects provenance signed by **this** repo’s `action.yml` workflow. Adjust `subjectRegExp` in that file if your org or repo name differs.
 
-**Test:**
+## Test admission
+
+**Allowed** (image built by this repo’s CI):
 
 ```bash
-kubectl run demo-pod --image=ghcr.io/YOUR_ORG/demo-github-attestations-sbom:github-attestation --restart=Never -- /bin/sh -c "sleep 30"
+kubectl run ok --image=ghcr.io/<org>/pov-github-attestations-sbom:github-attestation \
+  --restart=Never -- /bin/sh -c "sleep 600"
 ```
 
-If the pod is admitted, provenance verification passed. (SBOM is attested on the `:github-sbom` image; use that tag to exercise the SBOM policy.)
+**Denied** (different workflow / not trusted identity), example:
 
-**Note:** Images are built when you push to `main`. If you see `MANIFEST_UNKNOWN`, wait a minute for GHCR to finish publishing, or trigger the workflow from Actions and wait for it to complete.
+```bash
+kubectl run bad --image=ghcr.io/<org>/kubectl:1.35.0 --restart=Never -- sleep 600
+```
+
+Or apply the samples:
+
+```bash
+kubectl apply -f sample-resources/pod-attested-github.yaml      # expect created
+kubectl apply -f sample-resources/pod-unattested-github.yaml     # expect denied
+kubectl delete pod test-attested-github test-unattested-github --ignore-not-found
+```
 
 ## Reference
 
-- [GitHub: Generating build provenance for container images](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations#generating-build-provenance-for-container-images)
-- [Kyverno: ImageValidatingPolicy](https://kyverno.io/docs/policy-types/image-validating-policy/)
+- [Kyverno ImageValidatingPolicy](https://kyverno.io/docs/policy-types/image-validating-policy/)
